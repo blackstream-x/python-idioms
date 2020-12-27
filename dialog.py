@@ -2,7 +2,7 @@
 
 """
 
-svnlinux.dialog
+dialog
 
 User interaction functions (logging and text input)
 
@@ -162,57 +162,66 @@ class WrappedTextLogger:
             #
         #
 
-    def _log(self, level, msg, args):
-        """Mix the logging functions
-        with self.wrap_preserving_linebreaks().
+    def log(self, level, msg, *args):
+        """logging.log()
+        mixed with self.wrap_preserving_linebreaks()
         """
         msg = formatted_message(msg, *args)
         for line in self.wrap_preserving_linebreaks(msg):
             logging.log(level, line)
         #
 
-    def log(self, level, msg, *args):
-        """logging.log()
-        mixed with self.wrap_preserving_linebreaks()
-        """
-        self._log(level, msg, args)
-
     def debug(self, msg, *args):
         """logging.debug()
         mixed with self.wrap_preserving_linebreaks()
         """
-        self._log(logging.DEBUG, msg, args)
+        self.log(logging.DEBUG, msg, *args)
 
     def info(self, msg, *args):
         """logging.info()
         mixed with self.wrap_preserving_linebreaks()
         """
-        self._log(logging.INFO, msg, args)
+        self.log(logging.INFO, msg, *args)
 
     def warning(self, msg, *args):
         """logging.warning()
         mixed with self.wrap_preserving_linebreaks()
         """
-        self._log(logging.WARNING, msg, args)
+        self.log(logging.WARNING, msg, *args)
 
     def error(self, msg, *args):
         """logging.error()
         mixed with self.wrap_preserving_linebreaks()
         """
-        self._log(logging.ERROR, msg, args)
+        self.log(logging.ERROR, msg, *args)
 
     def critical(self, msg, *args):
         """logging.critical()
         mixed with self.wrap_preserving_linebreaks()
         """
-        self._log(logging.CRITICAL, msg, args)
+        self.log(logging.CRITICAL, msg, *args)
 
     fatal = critical
 
-    def exit_with_error(self, message, *args, returncode=RC_ERROR):
+    def _exit(self, message, *args, level=logging.ERROR, returncode=RC_ERROR):
         """Exit with an error message"""
-        self.error(message, *args)
+        self.log(level, message, *args)
         sys.exit(returncode)
+
+    def exit_if(self,
+                condition,
+                message,
+                *args,
+                level=logging.ERROR,
+                returncode=RC_ERROR):
+        """Exit with message if the condition is met"""
+        if condition:
+            self._exit(message, *args, level=level, returncode=returncode)
+        #
+
+    def exit_with_error(self, message, *args, returncode=RC_ERROR):
+        """Exit with an error message unconditionally"""
+        self._exit(message, *args, returncode=returncode)
 
     def configure(self, **kwargs):
         """Configure logging"""
@@ -338,7 +347,8 @@ class Interrogator:
                         not_before.strftime(FS_DATE_DE)))
             #
             return answer_date
-        elif isinstance(default, datetime.date):
+        #
+        if isinstance(default, datetime.date):
             return default
         #
         raise ValueError(self.msg_no_date)
