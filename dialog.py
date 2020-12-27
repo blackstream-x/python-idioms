@@ -30,10 +30,12 @@ DATE_ORDERS = {
     '/': 'mdy'}
 
 DEFAULT_OUTPUT_WIDTH = 85
+DEFAULT_HEADING_INDENT = 3
 
 FS_DATE_DE = '%d.%m.%Y'
 FS_DATE_ISO = '%Y-%m-%d'
 
+FS_ATTRIBUTE_ERROR = '{0!r} object has no attribute {1!r}'
 FS_MESSAGE = '%(levelname)-8s| %(message)s'
 
 MSG_INVALID_ORDER = 'Ungültige Reihenfolge {0!r}!'
@@ -121,9 +123,143 @@ def formatted_message(msg, *args):
     return msg
 
 
+def wrap_preserving_linebreaks(textwrapper, source_text):
+    """Generator function yielding lines wrapped by the given textwrapper
+    instance, preserving pre-existing line breaks
+    """
+    for source_line in source_text.splitlines():
+        if source_line:
+            for output_line in textwrapper.wrap(source_line):
+                yield output_line
+            #
+        else:
+            yield source_line
+        #
+    #
+
+
 #
 # Classes
 #
+
+
+class BoxElements(dict):
+
+    """dict-like namespace holding some box drawing elements."""
+
+    def __getattr__(self, name):
+        """Return the character for the codepoint of the name element,
+        or default to self['all'] if defined
+        """
+        if name != 'all':
+            try:
+                return chr(self[name])
+            except KeyError:
+                try:
+                    return chr(self['all'])
+                except KeyError:
+                    pass
+                #
+            #
+        #
+        raise AttributeError(
+            FS_ATTRIBUTE_ERROR.format(self.__cöass__.__name__, name))
+
+
+class BoxFormatter:
+
+    """Formatter for separators or headings in a given style"""
+
+    light = 'light'
+    heavy = 'heavy'
+    double = 'double'
+    star = '*'
+    pound = '#'
+
+    styles = {
+        light: BoxElements(
+            horizontal=0x2500,
+            vertical=0x2502,
+            shoulder=0x252c,
+            lower_left_corner=0x2514,
+            lower_right_corner=0x2518),
+        heavy: BoxElements(
+            horizontal=0x2501,
+            vertical=0x2503,
+            shoulder=0x2533,
+            lower_left_corner=0x2517,
+            lower_right_corner=0x251b),
+        double: BoxElements(
+            horizontal=0x2550,
+            vertical=0x2551,
+            shoulder=0x2566,
+            lower_left_corner=0x255a,
+            lower_right_corner=0x255d),
+        star: BoxElements(all=ord(star)),
+        pound: BoxElements(all=ord(pound))}
+
+    fs_first_line = '{prefix}{style.shoulder}{overline}{style.shoulder}'
+    fs_middle_line = (
+        '{prefix}{style.vertical}'
+        ' {contents: <{width}} {style.vertical}')
+    fs_last_line = (
+        '{prefix}{style.lower_left_corner}'
+        '{underline}{style.lower_right_corner}')
+
+    def __init__(self,
+                 full_width=DEFAULT_OUTPUT_WIDTH,
+                 heading_indent=DEFAULT_HEADING_INDENT):
+        """Initialize with the given values"""
+        self.full_width = full_width
+        self.heading_indent = heading_indent
+        self.textwrapper = textwrap.TextWrapper(
+            width=full_width - 2 * heading_indent - 4)
+
+    def separator(self, style=None):
+        """Return a separator using the requested style"""
+        if style is None:
+            style = self.light
+        #
+        return self.styles[style].horizontal * self.full_width
+
+    def heading(self, text, style=None):
+        """Return a heading using the requested style"""
+        if not text:
+            return self.separator(style=style)
+        #
+        if style is None:
+            style = self.light
+        #
+        selected_style = self.styles[style]
+        heading_lines = list(
+            wrap_preserving_linebreaks(self.textwrapper, text))
+        max_line_length = max(len(line) for line in heading_lines)
+        horizontal_frame = selected_style.horizontal * (max_line_length + 2)
+        blank_prefix = ' ' * self.heading_indent
+        first_line = self.fs_first_line.format(
+            prefix=selected_style.horizontal * self.heading_indent,
+            overline=horizontal_frame,
+            style=selected_style)
+        output_lines = [
+            '{contents:{style.horizontal}<{width}}'.format(
+                contents=first_line,
+                width=self.full_width,
+                style=selected_style)]
+        for line in heading_lines:
+            output_lines.append(
+                self.fs_middle_line.format(
+                    prefix=blank_prefix,
+                    contents=line,
+                    width=max_line_length,
+                    style=selected_style))
+        #
+        output_lines.append(
+            self.fs_last_line.format(
+                prefix=blank_prefix,
+                underline=horizontal_frame,
+                style=selected_style))
+        #
+        return '\n'.join(output_lines)
 
 
 class WrappedTextLogger:
@@ -132,42 +268,32 @@ class WrappedTextLogger:
 
     def __init__(self,
                  message_format=FS_MESSAGE,
-                 width=DEFAULT_OUTPUT_WIDTH):
+                 width=DEFAULT_OUTPUT_WIDTH,
+                 heading_indent=DEFAULT_HEADING_INDENT):
         """Initialize an internal textwrapper"""
         self.textwrapper = textwrap.TextWrapper(width=width)
+        self.box_formatter = BoxFormatter(
+            full_width=width,
+            heading_indent=heading_indent)
         self.message_format = message_format
         self.width = width
 
-    @property
-    def separator_line(self):
-        """Return a separator line matching the width"""
-        return '-' * self.width
+    def separator(self, style=None, level=logging.INFO):
+        """Log a separator (line) matching the width"""
+        self.log(level, self.box_formatter.separator(style=style))
 
-    @property
-    def double_separator_line(self):
-        """Return a double separator line matching the width"""
-        return '=' * self.width
-
-    def wrap_preserving_linebreaks(self, source_text):
-        """Generator function yieling lines wrapped to maximum <self.width>
-        columns, but preserving pre-existing line breaks
-        """
-        for source_line in source_text.splitlines():
-            if source_line:
-                for output_line in self.textwrapper.wrap(source_line):
-                    yield output_line
-                #
-            else:
-                yield source_line
-            #
-        #
+    def heading(self, text, style=None, level=logging.INFO):
+        """Log a heading matching the width"""
+        self.log(
+            level,
+            self.box_formatter.heading(text, style=style))
 
     def log(self, level, msg, *args):
         """logging.log()
         mixed with self.wrap_preserving_linebreaks()
         """
         msg = formatted_message(msg, *args)
-        for line in self.wrap_preserving_linebreaks(msg):
+        for line in wrap_preserving_linebreaks(self.textwrapper, msg):
             logging.log(level, line)
         #
 
