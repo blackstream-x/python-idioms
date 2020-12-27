@@ -2,9 +2,9 @@
 
 """
 
-dialog
+svnlinux.dialog
 
-User interaction functions
+User interaction functions (logging and text input)
 
 """
 
@@ -14,7 +14,6 @@ import datetime
 import logging
 import sys
 import textwrap
-
 
 
 #
@@ -30,12 +29,17 @@ DATE_ORDERS = {
     # Assume US-american date format (m/d, m/d/yy, m/d/yyyy)
     '/': 'mdy'}
 
-DEFAULT_OUTPUT_WIDTH = 70
+DEFAULT_OUTPUT_WIDTH = 85
 
 FS_DATE_DE = '%d.%m.%Y'
 FS_DATE_ISO = '%Y-%m-%d'
 
 FS_MESSAGE = '%(levelname)-8s| %(message)s'
+
+MSG_INVALID_ORDER = 'Ungültige Reihenfolge {0!r}!'
+MSG_INVALID_DATE = 'Konnte kein Datum aus {0!r} ableiten!'
+
+RC_ERROR = 1
 
 
 #
@@ -54,10 +58,10 @@ def date_from_components(date_components, order='dmy', default=None):
         year_index = order.index('y')
     except ValueError as value_error:
         raise ValueError(
-            'Invalid order {0!r}!'.format(order)) from value_error
+            MSG_INVALID_ORDER.format(order)) from value_error
     #
     if len(order) != 3:
-        raise ValueError('Invalid order {0!r}!'.format(order))
+        raise ValueError(MSG_INVALID_ORDER.format(order))
     #
     try:
         day = int(date_components[day_index])
@@ -98,8 +102,23 @@ def date_from_string(date_string, default=None):
                 default=default)
         #
     #
-    raise ValueError(
-        'Could not determine a date from {0!r}!'.format(date_string))
+    raise ValueError(MSG_INVALID_DATE.format(date_string))
+
+
+def formatted_message(msg, *args):
+    """Return the message percent-formatted with the arguments.
+    Adapted from
+    <https://github.com/python/cpython/blob/3.6/Lib/logging/__init__.py>
+    (lines 277-279)
+    """
+    if args:
+        if (len(args) == 1 and isinstance(args[0], collections.Mapping)
+                and args[0]):
+            args = args[0]
+        #
+        return msg % args
+    #
+    return msg
 
 
 #
@@ -112,10 +131,22 @@ class WrappedTextLogger:
     """Log wrapped text"""
 
     def __init__(self,
+                 message_format=FS_MESSAGE,
                  width=DEFAULT_OUTPUT_WIDTH):
         """Initialize an internal textwrapper"""
         self.textwrapper = textwrap.TextWrapper(width=width)
-        #self.width = width
+        self.message_format = message_format
+        self.width = width
+
+    @property
+    def separator_line(self):
+        """Return a separator line matching the width"""
+        return '-' * self.width
+
+    @property
+    def double_separator_line(self):
+        """Return a double separator line matching the width"""
+        return '=' * self.width
 
     def wrap_preserving_linebreaks(self, source_text):
         """Generator function yieling lines wrapped to maximum <self.width>
@@ -132,56 +163,73 @@ class WrappedTextLogger:
         #
 
     def _log(self, level, msg, args):
-        """Mix the logging functions with self.wrap_preserving_linebreaks().
-        Adapted from
-        <https://github.com/python/cpython/blob/3.6/Lib/logging/__init__.py>
-        (lines 277-279)
+        """Mix the logging functions
+        with self.wrap_preserving_linebreaks().
         """
-        if args:
-            if (len(args) == 1 and isinstance(args[0], collections.Mapping)
-                    and args[0]):
-                args = args[0]
-            #
-            msg = msg % args
-        #
+        msg = formatted_message(msg, *args)
         for line in self.wrap_preserving_linebreaks(msg):
             logging.log(level, line)
         #
 
     def log(self, level, msg, *args):
-        """logging.log() mixed with self.wrap_preserving_linebreaks()"""
+        """logging.log()
+        mixed with self.wrap_preserving_linebreaks()
+        """
         self._log(level, msg, args)
 
     def debug(self, msg, *args):
-        """logging.debug() mixed with self.wrap_preserving_linebreaks()"""
+        """logging.debug()
+        mixed with self.wrap_preserving_linebreaks()
+        """
         self._log(logging.DEBUG, msg, args)
 
     def info(self, msg, *args):
-        """logging.info() mixed with self.wrap_preserving_linebreaks()"""
+        """logging.info()
+        mixed with self.wrap_preserving_linebreaks()
+        """
         self._log(logging.INFO, msg, args)
 
     def warning(self, msg, *args):
-        """logging.warning() mixed with self.wrap_preserving_linebreaks()"""
+        """logging.warning()
+        mixed with self.wrap_preserving_linebreaks()
+        """
         self._log(logging.WARNING, msg, args)
 
     def error(self, msg, *args):
-        """logging.error() mixed with self.wrap_preserving_linebreaks()"""
+        """logging.error()
+        mixed with self.wrap_preserving_linebreaks()
+        """
         self._log(logging.ERROR, msg, args)
 
     def critical(self, msg, *args):
-        """logging.critical() mixed with self.wrap_preserving_linebreaks()"""
+        """logging.critical()
+        mixed with self.wrap_preserving_linebreaks()
+        """
         self._log(logging.CRITICAL, msg, args)
 
     fatal = critical
+
+    def exit_with_error(self, message, *args, returncode=RC_ERROR):
+        """Exit with an error message"""
+        self.error(message, *args)
+        sys.exit(returncode)
+
+    def configure(self, **kwargs):
+        """Configure logging"""
+        kwargs.setdefault('format', self.message_format)
+        logging.basicConfig(**kwargs)
 
 
 class Interrogator:
 
     """Object for user interaction"""
 
-    # Todo: english version that can be subclassed by a german one
-
     answers = {True: 'ja', False: 'nein'}
+    fs_date_not_after = 'Das Datum darf nicht nach dem {0} liegen!'
+    fs_date_not_before = 'Das Datum darf nicht vor dem {0} liegen!'
+    fs_default_value = '{0}\n(Standardwert ist {1})'
+    fs_interpreting_as = 'Ich interpretiere das als %r.'
+    msg_no_date = 'Kein Datum angegeben und kein Standardwert!'
     pseudo_loglevel = '(INPUT)'
 
     def __init__(self,
@@ -191,11 +239,12 @@ class Interrogator:
                  logger=None):
         """Set internal message format"""
         self.default_prompt = default_prompt
-        self.message_format = message_format
         if isinstance(logger, WrappedTextLogger):
             self.logger = logger
         else:
-            self.logger = WrappedTextLogger(width=width)
+            self.logger = WrappedTextLogger(
+                message_format=message_format,
+                width=width)
         #
 
     def get_input(self, question_text, *args, **kwargs):
@@ -203,8 +252,7 @@ class Interrogator:
         if question_text:
             self.logger.info(question_text, *args)
         #
-        input_prompt = self.message_format % collections.defaultdict(
-            str,
+        input_prompt = self.logger.message_format % dict(
             levelname=self.pseudo_loglevel,
             message=kwargs.get('prompt') or self.default_prompt)
         return input(input_prompt).strip()
@@ -223,7 +271,7 @@ class Interrogator:
             placeholder = '%r'
         #
         answer = self.get_input(
-            '{0}\n(Standardwert ist {1})'.format(
+            self.fs_default_value.format(
                 question_text,
                 placeholder),
             *args,
@@ -234,8 +282,9 @@ class Interrogator:
         return preset_answer
 
     def ask_polar_question(self, question_text, *args, **kwargs):
-        """Ask for user input, set preset_answer if no input was provided.
-        Return True or False
+        """Ask for user input and assume the answer determined by
+        preset_value if no input was provided.
+        Return True or False.
         """
         preset_value = kwargs.pop('preset_value', False)
         kwargs['preset_answer'] = self.answers[preset_value]
@@ -245,7 +294,7 @@ class Interrogator:
                 return answer_value
             #
         #
-        self.logger.info('Ich interpretiere das als %r.', self.answers[False])
+        self.logger.info(self.fs_interpreting_as, self.answers[False])
         return False
 
     def confirm(self, question_text, *args, **kwargs):
@@ -279,34 +328,20 @@ class Interrogator:
             if isinstance(not_after,
                           datetime.date) and answer_date > not_after:
                 raise ValueError(
-                    'Das Datum darf nicht nach dem {0} liegen!'.format(
+                    self.fs_date_not_after.format(
                         not_after.strftime(FS_DATE_DE)))
             #
             if isinstance(not_before,
                           datetime.date) and answer_date < not_before:
                 raise ValueError(
-                    'Das Datum darf nicht vor dem {0} liegen!'.format(
+                    self.fs_date_not_before.format(
                         not_before.strftime(FS_DATE_DE)))
             #
             return answer_date
         elif isinstance(default, datetime.date):
             return default
         #
-        raise ValueError('Kein Datum angegeben und kein Standardwert!')
-
-
-#
-# Functions
-#
-
-
-def exit_error(message, *args, logger=None, returncode=1):
-    """Print an error message and exit"""
-    if not isinstance(logger, WrappedTextLogger):
-        logger = logging
-    #
-    logging.error(message, *args)
-    sys.exit(returncode)
+        raise ValueError(self.msg_no_date)
 
 
 # vim: fileencoding=utf-8 sw=4 ts=4 sts=4 expandtab autoindent syntax=python:
