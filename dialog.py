@@ -149,21 +149,19 @@ class BoxElements(dict):
 
     def __getattr__(self, name):
         """Return the character for the codepoint of the name element,
-        or default to self['all'] if defined
+        or default to self['each'] if defined
         """
-        if name != 'all':
+        if name != 'each':
             try:
-                return chr(self[name])
+                codepoint = self.setdefault(name, self['each'])
             except KeyError:
-                try:
-                    return chr(self['all'])
-                except KeyError:
-                    pass
-                #
+                pass
+            else:
+                return chr(codepoint)
             #
         #
         raise AttributeError(
-            FS_ATTRIBUTE_ERROR.format(self.__cöass__.__name__, name))
+            FS_ATTRIBUTE_ERROR.format(self.__class__.__name__, name))
 
 
 class BoxFormatter:
@@ -195,8 +193,8 @@ class BoxFormatter:
             shoulder=0x2566,
             lower_left_corner=0x255a,
             lower_right_corner=0x255d),
-        star: BoxElements(all=ord(star)),
-        pound: BoxElements(all=ord(pound))}
+        star: BoxElements(each=ord(star)),
+        pound: BoxElements(each=ord(pound))}
 
     fs_first_line = '{prefix}{style.shoulder}{overline}{style.shoulder}'
     fs_middle_line = (
@@ -282,8 +280,9 @@ class WrappedTextLogger:
         """Log a separator (line) matching the width"""
         self.log(level, self.box_formatter.separator(style=style))
 
-    def heading(self, text, style=None, level=logging.INFO):
+    def heading(self, msg, *args, style=None, level=logging.INFO):
         """Log a heading matching the width"""
+        text = formatted_message(msg, *args)
         self.log(
             level,
             self.box_formatter.heading(text, style=style))
