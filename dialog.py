@@ -153,11 +153,14 @@ class BoxElements(dict):
         """
         if name != 'each':
             try:
-                codepoint = self.setdefault(name, self['each'])
+                return chr(self[name])
             except KeyError:
                 pass
-            else:
-                return chr(codepoint)
+            #
+            try:
+                return chr(self.setdefault(name, self['each']))
+            except KeyError:
+                pass
             #
         #
         raise AttributeError(
