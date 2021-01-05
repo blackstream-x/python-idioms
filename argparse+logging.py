@@ -20,7 +20,7 @@ import sys
 #
 
 MESSAGE_FORMAT_PURE = '%(message)s'
-MESSAGE_FORMAT_WITH_LEVELNAME = '%(levelname)-8s| %(message)s'
+MESSAGE_FORMAT_WITH_LEVELNAME = '%(levelname)-8s\u2551 %(message)s'
 
 RETURNCODE_OK = 0
 RETURNCODE_ERROR = 1

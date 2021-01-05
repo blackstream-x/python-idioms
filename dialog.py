@@ -36,10 +36,10 @@ FS_DATE_DE = '%d.%m.%Y'
 FS_DATE_ISO = '%Y-%m-%d'
 
 FS_ATTRIBUTE_ERROR = '{0!r} object has no attribute {1!r}'
-FS_MESSAGE = '%(levelname)-8s| %(message)s'
+FS_MESSAGE = '%(levelname)-8s\u2551 %(message)s'
 
-MSG_INVALID_ORDER = 'Ungültige Reihenfolge {0!r}!'
-MSG_INVALID_DATE = 'Konnte kein Datum aus {0!r} ableiten!'
+MSG_INVALID_ORDER = 'Invalid order {0!r}!'
+MSG_INVALID_DATE = 'Could not determine a date from {0!r}!'
 
 RC_ERROR = 1
 
@@ -361,12 +361,12 @@ class Interrogator:
 
     """Object for user interaction"""
 
-    answers = {True: 'ja', False: 'nein'}
-    fs_date_not_after = 'Das Datum darf nicht nach dem {0} liegen!'
-    fs_date_not_before = 'Das Datum darf nicht vor dem {0} liegen!'
-    fs_default_value = '{0}\n(Standardwert ist {1})'
-    fs_interpreting_as = 'Ich interpretiere das als %r.'
-    msg_no_date = 'Kein Datum angegeben und kein Standardwert!'
+    answers = {True: 'yes', False: 'no'}
+    fs_date_not_after = 'Date after {0} lnot allowed!'
+    fs_date_not_before = 'Date before {0} not allowed!'
+    fs_default_value = '{0}\n(default: {1})'
+    fs_interpreting_as = 'Interpreting as %r.'
+    msg_no_date = 'No date given, and no default set!'
     pseudo_loglevel = '(INPUT)'
 
     def __init__(self,
@@ -480,6 +480,18 @@ class Interrogator:
             return default
         #
         raise ValueError(self.msg_no_date)
+
+
+class InterrogatorTranslatedDe(Interrogator):
+
+    """Object for user interaction (german translations)"""
+
+    answers = {True: 'ja', False: 'nein'}
+    fs_date_not_after = 'Das Datum darf nicht nach dem {0} liegen!'
+    fs_date_not_before = 'Das Datum darf nicht vor dem {0} liegen!'
+    fs_default_value = '{0}\n(Standardwert ist {1})'
+    fs_interpreting_as = 'Ich interpretiere das als %r.'
+    msg_no_date = 'Kein Datum angegeben und kein Standardwert!'
 
 
 # vim: fileencoding=utf-8 sw=4 ts=4 sts=4 expandtab autoindent syntax=python:
