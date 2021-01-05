@@ -62,7 +62,7 @@ def __get_arguments():
         action='store_const',
         const=dialog.logging.WARNING,
         dest='loglevel',
-        help='Limit message outputpto warnings and errors')
+        help='Limit message output to warnings and errors')
 
     ...
 
