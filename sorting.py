@@ -21,11 +21,11 @@ class SortableMixin:
     """
 
     def __eq__(self, other):
-        """Richcomparison: equals"""
+        """Rich comparison: equals"""
         return self.sort_key == other.sort_key
 
     def __gt__(self, other):
-        """Richcomparison: greater than"""
+        """Rich comparison: greater than"""
         return self.sort_key > other.sort_key
 
 
