@@ -35,7 +35,7 @@ SCRIPT_NAME = '...'
 HOMEPAGE = 'https://github.com/blackstream-x/PROJECT_NAME'
 MAIN_WINDOW_TITLE = 'PROJECT_NAME: ...'
 
-SCRIPT_PATH = pathlib.Path(sys.argv[0])
+SCRIPT_PATH = pathlib.Path(os.path.realpath(sys.argv[0]))
 # Follow symlinks
 if SCRIPT_PATH.is_symlink():
     SCRIPT_PATH = SCRIPT_PATH.readlink()
@@ -55,7 +55,8 @@ except OSError as error:
     VERSION = '(Version file is missing: %s)' % error
 #
 
-# Phases
+# Phase names used as parts of method names
+# (do_…, panel_…, rollback_…)
 CHOOSE_FILE = 'choose_file'
 STEP_1 = 'step_1'
 STEP_2 = 'step_2'
