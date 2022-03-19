@@ -2,7 +2,7 @@
 
 """
 
-immutable_dict
+frozen_dict
 
 An immutable and hashable dict-like class
 
@@ -12,13 +12,13 @@ An immutable and hashable dict-like class
 from collections import abc
 
 
-class ImmutableDict(abc.Mapping, abc.Hashable):
+class FrozenDict(abc.Mapping, abc.Hashable):
 
-    """Immutable and hashable dict-like class
+    """Immutable and hashable dict-like object
 
     JSON or YAML serialization is not supported directly,
     but can be done by creating a dict from the instance
-    (eg. using the .as_mutable_dict() method).
+    (eg. using the .unfreeze() method).
     """
 
     def __init__(self, *args, **kwargs):
@@ -37,8 +37,8 @@ class ImmutableDict(abc.Mapping, abc.Hashable):
         self.__keys = tuple(data.keys())
         self.__values = tuple(data.values())
 
-    def as_mutable_dict(self):
-        """Return a standard dict from self"""
+    def unfreeze(self):
+        """Return a normal dict from self"""
         return dict(self)
 
     def items(self):
@@ -55,9 +55,17 @@ class ImmutableDict(abc.Mapping, abc.Hashable):
             raise KeyError(name) from error
         #
 
+    def get(self, name, default=None):
+        """Return the value for key 'name' or default"""
+        try:
+            return self[name]
+        except KeyError:
+            return default
+        #
+
     def __hash__(self):
-        """Return the hash of the str representation"""
-        return hash(repr(self))
+        """Return a hash value"""
+        return hash((self.__class__, self.__keys, self.__values))
 
     def __iter__(self):
         """Return an iterator over the keys"""
