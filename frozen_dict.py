@@ -28,7 +28,7 @@ class FrozenDict(abc.Mapping, abc.Hashable):
             try:
                 hash(value)
             except TypeError as error:
-                raise ValueError(
+                raise TypeError(
                     f"Cannot create the {self.__class__.__name__} instance:"
                     f" value {value!r} is not hashable!"
                 ) from error
@@ -37,7 +37,7 @@ class FrozenDict(abc.Mapping, abc.Hashable):
         self.__keys = tuple(data.keys())
         self.__values = tuple(data.values())
 
-    def unfreeze(self):
+    def unfrozen(self):
         """Return a normal dict from self"""
         return dict(self)
 
