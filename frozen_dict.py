@@ -80,7 +80,9 @@ def deepfreeze(item):
     pendant of item. For collections, this implies
     that all members are frozen too.
     """
-    if isinstance(item, (str, int, float, frozenset, FrozenDict)):
+    if item in (True, False, None, Ellipsis) or isinstance(
+        item, (str, int, float, frozenset, FrozenDict)
+    ):
         return item
     #
     if isinstance(item, set):
@@ -107,6 +109,27 @@ def deepfreeze(item):
     #
     # TODO: check if item is a collection, mutable etc.
     raise NotImplementedError
+
+
+def serializable(item, keep_hashable=False):
+    """Return a serializable pendan to item"""
+    if item in (True, False, None) or isinstance(item, (str, int, float)):
+        return item
+    #
+    if isinstance(item, (list, set)):
+        return [serializable(member) for member in item]
+    #
+    if isinstance(item, (tuple, frozenset)):
+        return [
+            serializable(member, keep_hashable=keep_hashable)
+            for member in item
+        ]
+    #
+    # TODO: dict, FrozenDict
+    ...
+    #
+    #
+    raise TypeError(f"Cannot serialize {item.__class__.__name__} {item!r}")
 
 
 # vim: fileencoding=utf-8 sw=4 ts=4 sts=4 expandtab autoindent syntax=python:
