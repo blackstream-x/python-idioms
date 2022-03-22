@@ -14,7 +14,7 @@ from collections import abc
 
 class FrozenDict(abc.Mapping, abc.Hashable):
 
-    """Immutable and hashable dict-like object
+    """Immutable and hashable object mimicking dict behavior
 
     JSON or YAML serialization is not supported directly,
     but can be done by creating a dict from the instance
@@ -23,19 +23,8 @@ class FrozenDict(abc.Mapping, abc.Hashable):
 
     def __init__(self, *args, **kwargs):
         """Allocate the inner data structure"""
-        data = dict(*args, **kwargs)
-        for value in data.values():
-            try:
-                hash(value)
-            except TypeError as error:
-                raise TypeError(
-                    f"Cannot create the {self.__class__.__name__} instance:"
-                    f" value {value!r} is not hashable!"
-                ) from error
-            #
-        #
-        self.__keys = tuple(data.keys())
-        self.__values = tuple(data.values())
+        self.__data = tuple(dict(*args, **kwargs).items())
+        self.__cached_hash = hash((self.__class__, self.__data))
 
     def unfrozen(self):
         """Return a normal dict from self"""
@@ -43,17 +32,18 @@ class FrozenDict(abc.Mapping, abc.Hashable):
 
     def items(self):
         """Return an iterator over (key, value) pairs"""
-        for index, key in enumerate(self.__keys):
-            yield key, self.__values[index]
+        for key, value in self.__data:
+            yield key, value
         #
 
     def __getitem__(self, name):
         """Return the value for key 'name'"""
-        try:
-            return self.__values[self.__keys.index(name)]
-        except ValueError as error:
-            raise KeyError(name) from error
+        for key, value in self.__data:
+            if key == name:
+                return value
+            #
         #
+        raise KeyError(name)
 
     def get(self, key, default=None):
         """Return the value for key 'name' or default"""
@@ -65,15 +55,17 @@ class FrozenDict(abc.Mapping, abc.Hashable):
 
     def __hash__(self):
         """Return a hash value"""
-        return hash((self.__class__, self.__keys, self.__values))
+        return self.__cached_hash
 
     def __iter__(self):
         """Return an iterator over the keys"""
-        return iter(self.__keys)
+        for key, _ in self.__data:
+            yield key
+        #
 
     def __len__(self):
         """Return the number of items"""
-        return len(self.__keys)
+        return len(self.__data)
 
     def __repr__(self):
         """String representation"""
